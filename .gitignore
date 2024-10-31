@@ -31,20 +31,3 @@ logs/
 # Optional npm cache directory
 .npm
 
-# Optional eslint cache
-.eslintcache
-
-# Optional: Next.js
-.next/
-out/
-
-# Optional: Nuxt.js
-.nuxt/
-
-# Optional: Gatsby
-.cache/
-public/
-
-# Debug
-debug/
-.debug/
