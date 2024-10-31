@@ -1,0 +1,15 @@
+{
+  "name": "email-bakeoff-expressjs",
+  "version": "1.0.0",
+  "description": "Demo to show off how to switch between email providers using LaunchDarkly",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Tilde Thurium",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1"
+  }
+}
