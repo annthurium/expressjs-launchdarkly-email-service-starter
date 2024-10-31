@@ -10,11 +10,40 @@ const app = express();
 app.use(serveStatic(path.join(__dirname, "public")));
 app.use(bodyParser.urlencoded({ extended: false }));
 
+const { Resend } = require("resend");
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+async function sendPasswordResetEmailWithResend(email) {
+  try {
+    const data = await resend.emails.send({
+      from: "Tilde's Cupcake Shoppe <password-reset@tilde-thurium.dev>",
+      to: email,
+      subject: "Reset Your Password",
+      html: `
+        <h1>Password Reset Request</h1>
+        <p>Hello!</p>
+        <p>We received a request to reset your password for Tilde's Cupcake Shoppe.</p>
+        <p>Please click the link below to reset your password:</p>
+        <p><a href="http://localhost:3000/reset-password">Reset Password</a></p>
+        <p>If you didn't request this, you can safely ignore this email.</p>
+        <p>Best regards,<br>Tilde's Cupcake Shoppe Team</p>
+      `,
+    });
+    return { success: true, data };
+  } catch (error) {
+    console.error("Error sending password reset email:", error);
+    return { success: false, error };
+  }
+}
+
 app.post("/reset-password", async (req, res) => {
   const email = req.body.email;
   console.log("email", email);
-  // TODO: Implement password reset logic
-  res.status(200).json({ message: "Password reset endpoint reached" });
+  const emailData = await sendPasswordResetEmailWithResend(email);
+  console.log(emailData);
+  res.status(200).json({
+    message: "Check your email inbox for password reset instructions.",
+  });
 });
 
 // Initialize the LaunchDarkly client
