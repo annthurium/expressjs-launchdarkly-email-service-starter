@@ -26,7 +26,7 @@ async function sendPasswordResetEmailWithMailgun(email) {
     const data = await mg.messages.create(
       "sandboxc1f5d6428e5947d6b633ce6cf7ba27ef.mailgun.org",
       {
-        from: "Excited User <mailgun@sandboxc1f5d6428e5947d6b633ce6cf7ba27ef.mailgun.org>",
+        from: "Tilde's Cupcake Shoppe <mailgun@sandboxc1f5d6428e5947d6b633ce6cf7ba27ef.mailgun.org>",
         to: [email],
         subject: "Reset Your Password",
         html: `
@@ -73,8 +73,26 @@ async function sendPasswordResetEmailWithResend(email) {
 app.post("/reset-password", async (req, res) => {
   const email = req.body.email;
   console.log("email", email);
-  // const emailData = await sendPasswordResetEmailWithResend(email);
-  const emailData = await sendPasswordResetEmailWithMailgun(email);
+  const context = {
+    kind: "user",
+    key: email,
+    anonymous: true,
+  };
+
+  const emailProvider = await ldClient.variation(
+    "email-provider",
+    context,
+    "mailgun"
+  );
+  console.log("emailProvider", emailProvider);
+
+  let emailData;
+  if (emailProvider === "resend") {
+    emailData = await sendPasswordResetEmailWithResend(email);
+  } else {
+    emailData = await sendPasswordResetEmailWithMailgun(email);
+  }
+
   console.log(emailData);
   res.status(200).json({
     message: "Check your email inbox for password reset instructions.",
