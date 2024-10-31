@@ -13,6 +13,40 @@ app.use(bodyParser.urlencoded({ extended: false }));
 const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+const formData = require("form-data");
+const Mailgun = require("mailgun.js");
+const mailgun = new Mailgun(formData);
+const mg = mailgun.client({
+  username: "api",
+  key: process.env.MAILGUN_API_KEY,
+});
+
+async function sendPasswordResetEmailWithMailgun(email) {
+  try {
+    const data = await mg.messages.create(
+      "sandboxc1f5d6428e5947d6b633ce6cf7ba27ef.mailgun.org",
+      {
+        from: "Excited User <mailgun@sandboxc1f5d6428e5947d6b633ce6cf7ba27ef.mailgun.org>",
+        to: [email],
+        subject: "Reset Your Password",
+        html: `
+        <h1>Password Reset Request</h1>
+        <p>Hello!</p>
+        <p>We received a request to reset your password for Tilde's Cupcake Shoppe.</p>
+        <p>Please click the link below to reset your password:</p>
+        <p><a href="http://localhost:3000/reset-password">Reset Password</a></p>
+        <p>If you didn't request this, you can safely ignore this email.</p>
+        <p>Best regards,<br>Tilde's Cupcake Shoppe Team</p>
+      `,
+      }
+    );
+    return { success: true, data };
+  } catch (error) {
+    console.error("Error sending password reset email:", error);
+    return { success: false, error };
+  }
+}
+
 async function sendPasswordResetEmailWithResend(email) {
   try {
     const data = await resend.emails.send({
@@ -39,7 +73,8 @@ async function sendPasswordResetEmailWithResend(email) {
 app.post("/reset-password", async (req, res) => {
   const email = req.body.email;
   console.log("email", email);
-  const emailData = await sendPasswordResetEmailWithResend(email);
+  // const emailData = await sendPasswordResetEmailWithResend(email);
+  const emailData = await sendPasswordResetEmailWithMailgun(email);
   console.log(emailData);
   res.status(200).json({
     message: "Check your email inbox for password reset instructions.",
