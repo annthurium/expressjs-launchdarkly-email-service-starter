@@ -2,15 +2,11 @@ const express = require("express");
 const path = require("path");
 
 const app = express();
+const serveStatic = require("serve-static");
 const port = process.env.PORT || 3000;
 
 // Serve static files from the 'public' directory
-app.use(express.static(path.join(__dirname, "public")));
-
-// Basic route for the home page
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
+app.use(serveStatic(path.join(__dirname, "public")));
 
 // Start the server
 app.listen(port, () => {
