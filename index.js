@@ -5,14 +5,9 @@ const serveStatic = require("serve-static");
 const launchDarkly = require("@launchdarkly/node-server-sdk");
 const bodyParser = require("body-parser");
 
-const app = express();
-
-app.use(serveStatic(path.join(__dirname, "public")));
-app.use(bodyParser.urlencoded({ extended: false }));
-
+const EmailService = require("./email-service");
 const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND_API_KEY);
-
 const formData = require("form-data");
 const Mailgun = require("mailgun.js");
 const mailgun = new Mailgun(formData);
@@ -21,61 +16,19 @@ const mg = mailgun.client({
   key: process.env.MAILGUN_API_KEY,
 });
 
-async function sendPasswordResetEmailWithMailgun(email) {
-  try {
-    const data = await mg.messages.create(
-      "sandboxc1f5d6428e5947d6b633ce6cf7ba27ef.mailgun.org",
-      {
-        from: "Tilde's Cupcake Shoppe <mailgun@sandboxc1f5d6428e5947d6b633ce6cf7ba27ef.mailgun.org>",
-        to: [email],
-        subject: "Reset Your Password",
-        html: `
-        <h1>Password Reset Request</h1>
-        <p>Hello!</p>
-        <p>We received a request to reset your password for Tilde's Cupcake Shoppe.</p>
-        <p>Please click the link below to reset your password:</p>
-        <p><a href="http://localhost:3000/reset-password">Reset Password</a></p>
-        <p>If you didn't request this, you can safely ignore this email.</p>
-        <p>Best regards,<br>Tilde's Cupcake Shoppe Team</p>
-      `,
-      }
-    );
-    return { success: true, data };
-  } catch (error) {
-    console.error("Error sending password reset email:", error);
-    return { success: false, error };
-  }
-}
+const app = express();
 
-async function sendPasswordResetEmailWithResend(email) {
-  try {
-    const data = await resend.emails.send({
-      from: "Tilde's Cupcake Shoppe <password-reset@tilde-thurium.dev>",
-      to: email,
-      subject: "Reset Your Password",
-      html: `
-        <h1>Password Reset Request</h1>
-        <p>Hello!</p>
-        <p>We received a request to reset your password for Tilde's Cupcake Shoppe.</p>
-        <p>Please click the link below to reset your password:</p>
-        <p><a href="http://localhost:3000/reset-password">Reset Password</a></p>
-        <p>If you didn't request this, you can safely ignore this email.</p>
-        <p>Best regards,<br>Tilde's Cupcake Shoppe Team</p>
-      `,
-    });
-    return { success: true, data };
-  } catch (error) {
-    console.error("Error sending password reset email:", error);
-    return { success: false, error };
-  }
-}
+app.use(serveStatic(path.join(__dirname, "public")));
+app.use(bodyParser.urlencoded({ extended: false }));
+
+const emailService = new EmailService(mg, resend);
 
 app.post("/reset-password", async (req, res) => {
-  const email = req.body.email;
-  console.log("email", email);
+  const userEmailAddress = req.body.email;
+  console.log("email", userEmailAddress);
   const context = {
     kind: "user",
-    key: email,
+    key: userEmailAddress,
     anonymous: true,
   };
 
@@ -86,14 +39,20 @@ app.post("/reset-password", async (req, res) => {
   );
   console.log("emailProvider", emailProvider);
 
-  let emailData;
-  if (emailProvider === "resend") {
-    emailData = await sendPasswordResetEmailWithResend(email);
-  } else {
-    emailData = await sendPasswordResetEmailWithMailgun(email);
+  let emailServiceResponseData;
+  try {
+    emailServiceResponseData = await emailService.sendPasswordReset(
+      userEmailAddress,
+      emailProvider
+    );
+  } catch (error) {
+    console.error("Error sending password reset email:", error);
+    return res.status(500).json({
+      message: "Failed to send password reset email. Please try again later.",
+    });
   }
 
-  console.log(emailData);
+  console.log(emailServiceResponseData);
   res.status(200).json({
     message: "Check your email inbox for password reset instructions.",
   });
@@ -104,20 +63,22 @@ const ldClient = launchDarkly.init(process.env.LAUNCHDARKLY_SDK_KEY);
 
 // Add the waitForInitialization function to ensure the client is ready before starting the server
 const timeoutInSeconds = 5;
+let server;
 ldClient.waitForInitialization({ timeout: timeoutInSeconds }).then(() => {
   const port = 3000;
-  const server = app.listen(port, function (err) {
+  server = app.listen(port, function (err) {
     if (err) console.log("Error in server setup");
     console.log(`Server listening on http://localhost:${port}`);
   });
 });
 
 // Add the following new function to gracefully close the connection to the LaunchDarkly server.
-process.on("SIGTERM", () => {
-  debug("SIGTERM signal received: closing HTTP server");
-  ld.close();
-  server.close(() => {
-    debug("HTTP server closed");
-    ldClient.close();
+process.on("SIGINT", () => {
+  console.log("SIGTERM signal received: closing HTTP server");
+  server.close(async () => {
+    console.log("HTTP server closed");
+    ldClient.close(() => {
+      console.log("LaunchDarkly client closed");
+    });
   });
 });
